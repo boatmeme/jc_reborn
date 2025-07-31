@@ -211,7 +211,7 @@ static void grRotateAndBlitToWindow(int rotation)
                     dstOffset = ((639 - x) * windowSfc->pitch) + (y * windowSfc->format->BytesPerPixel);
                     break;
                 case 180:
-                    dstOffset = ((479 - y) * windowSfc->pitch) + ((639 - x) * windowSfc->format->BytesPerPixel);
+                    dstOffset = ((windowSfc->h - 1 - y) * windowSfc->pitch) + ((windowSfc->w - 1 - x) * windowSfc->format->BytesPerPixel);
                     break;
                 case 270:
                     dstOffset = (x * windowSfc->pitch) + ((479 - y) * windowSfc->format->BytesPerPixel);
