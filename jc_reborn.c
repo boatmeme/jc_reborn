@@ -43,6 +43,7 @@ static int  argTtm      = 0;
 static int  argAds      = 0;
 static int  argPlayAll  = 0;
 static int  argIsland   = 0;
+static int  argRotation = 0;
 
 static char *args[3];
 static int  numArgs  = 0;
@@ -66,6 +67,7 @@ static void usage()
         printf("         island     - display the island as background for ADS play\n");
         printf("         debug      - print some debug info on stdout\n");
         printf("         hotkeys    - enable hot keys\n");
+        printf("         rotation <angle> - rotate screen (0, 90, 180, or 270)\n");
         printf("\n");
         printf(" While-playing hot-keys (if enabled):\n");
         printf("         Esc        - Terminate immediately\n");
@@ -135,6 +137,20 @@ static void parseArgs(int argc, char **argv)
             else if (!strcmp(argv[i], "hotkeys")) {
                 evHotKeysEnabled = 1;
             }
+            else if (!strcmp(argv[i], "rotation")) {
+                if (i + 1 < argc) {
+                    int rot = atoi(argv[i + 1]);
+                    if (rot == 0 || rot == 90 || rot == 180 || rot == 270) {
+                        argRotation = rot;
+                    } else {
+                        fprintf(stderr, "error: invalid rotation angle\n");
+                        usage();
+                    }
+                    i++;
+                } else {
+                    usage();
+                }
+            }
         }
     }
 
@@ -159,7 +175,7 @@ int main(int argc, char **argv)
     parseResourceFiles("RESOURCE.MAP");
 
     if (argPlayAll) {
-        graphicsInit();
+        graphicsInit(argRotation);
         soundInit();
 
         storyPlay();
@@ -173,13 +189,13 @@ int main(int argc, char **argv)
     }
 
     else if (argBench) {
-        graphicsInit();
+        graphicsInit(argRotation);
         adsPlayBench();
         graphicsEnd();
     }
 
     else if (argTtm) {
-        graphicsInit();
+        graphicsInit(argRotation);
         soundInit();
 
         adsPlaySingleTtm(args[0]);
@@ -190,7 +206,7 @@ int main(int argc, char **argv)
 
     else if (argAds) {
 
-        graphicsInit();
+        graphicsInit(argRotation);
         soundInit();
 
         if (argIsland)

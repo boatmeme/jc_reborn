@@ -78,13 +78,15 @@ extern int grWindowed;
 extern int grUpdateDelay;
 
 
-void graphicsInit();
+void graphicsInit(int rotation);
 void graphicsEnd();
 void grRefreshDisplay();
 void grToggleFullScreen();
 void grUpdateDisplay(struct TTtmThread *ttmBackgroundThread,
                      struct TTtmThread *ttmThreads,
                      struct TTtmThread *ttmHolidayThreads);
+
+static void grRotateAndBlitToWindow();
 
 SDL_Surface *grNewEmptyBackground();
 SDL_Surface *grNewLayer();

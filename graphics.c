@@ -38,6 +38,7 @@ static SDL_Window *sdl_window;
 static uint8 ttmPalette[16][4];
 
 static SDL_Surface *grSavedZonesLayer = NULL;
+static SDL_Surface *grOffscreenSfc = NULL;
 
 static SDL_Rect grScreenOrigin = { 0, 0, 0, 0 };   // TODO
 
@@ -47,6 +48,7 @@ int grDx = 0;
 int grDy = 0;
 int grWindowed = 0;
 int grUpdateDelay = 0;
+static int grRotation = 0;
 
 
 static void grReleaseScreen()
@@ -110,24 +112,37 @@ void grLoadPalette(struct TPalResource *palResource)
 }
 
 
-void graphicsInit()
+void graphicsInit(int rotation)
 {
+    grRotation = rotation;
+    int windowWidth = SCREEN_WIDTH;
+    int windowHeight = SCREEN_HEIGHT;
+
+    if (grRotation == 90 || grRotation == 270) {
+        windowWidth = SCREEN_HEIGHT;
+        windowHeight = SCREEN_WIDTH;
+    }
+
     SDL_Init(SDL_INIT_VIDEO);
 
     sdl_window = SDL_CreateWindow(
         "Johnny Reborn ...?",
         SDL_WINDOWPOS_UNDEFINED,
         SDL_WINDOWPOS_UNDEFINED,
-        SCREEN_WIDTH,
-        SCREEN_HEIGHT,
+        windowWidth,
+        windowHeight,
         (grWindowed ? 0 : SDL_WINDOW_FULLSCREEN)
     );
 
     if (sdl_window == NULL)
         fatalError("Could not create window: %s", SDL_GetError());
 
-    grScreenOrigin.x = (SCREEN_WIDTH - 640) / 2;
-    grScreenOrigin.y = (SCREEN_HEIGHT - 480) / 2;
+    grOffscreenSfc = SDL_CreateRGBSurface(SDL_SWSURFACE, 640, 480, 32, 0, 0, 0, 0);
+    if (grOffscreenSfc == NULL)
+        fatalError("Could not create offscreen surface: %s", SDL_GetError());
+
+    grScreenOrigin.x = (windowWidth - 640) / 2;
+    grScreenOrigin.y = (windowHeight - 480) / 2;
 
     if (!grWindowed)
         SDL_ShowCursor(SDL_DISABLE);
@@ -144,6 +159,7 @@ void graphicsInit()
 
 void graphicsEnd()
 {
+    SDL_FreeSurface(grOffscreenSfc);
     SDL_DestroyWindow(sdl_window);
     SDL_Quit();
 }
@@ -172,6 +188,48 @@ void grToggleFullScreen()
 }
 
 
+static void grRotateAndBlitToWindow(int rotation)
+{
+    SDL_Surface *windowSfc = SDL_GetWindowSurface(sdl_window);
+
+    SDL_LockSurface(grOffscreenSfc);
+    SDL_LockSurface(windowSfc);
+
+    uint8 *srcPixels = (uint8*) grOffscreenSfc->pixels;
+    uint8 *dstPixels = (uint8*) windowSfc->pixels;
+
+    for (int y = 0; y < 480; y++) {
+        for (int x = 0; x < 640; x++) {
+            int srcOffset = (y * grOffscreenSfc->pitch) + (x * grOffscreenSfc->format->BytesPerPixel);
+            int dstOffset;
+
+            switch (rotation) {
+                case 0:
+                    dstOffset = (y * windowSfc->pitch) + (x * windowSfc->format->BytesPerPixel);
+                    break;
+                case 90:
+                    dstOffset = ((639 - x) * windowSfc->pitch) + (y * windowSfc->format->BytesPerPixel);
+                    break;
+                case 180:
+                    dstOffset = ((windowSfc->h - 1 - y) * windowSfc->pitch) + ((windowSfc->w - 1 - x) * windowSfc->format->BytesPerPixel);
+                    break;
+                case 270:
+                    dstOffset = (x * windowSfc->pitch) + ((479 - y) * windowSfc->format->BytesPerPixel);
+                    break;
+            }
+
+            dstPixels[dstOffset] = srcPixels[srcOffset];
+            dstPixels[dstOffset + 1] = srcPixels[srcOffset + 1];
+            dstPixels[dstOffset + 2] = srcPixels[srcOffset + 2];
+            dstPixels[dstOffset + 3] = srcPixels[srcOffset + 3];
+        }
+    }
+
+    SDL_UnlockSurface(windowSfc);
+    SDL_UnlockSurface(grOffscreenSfc);
+}
+
+
 void grUpdateDisplay(struct TTtmThread *ttmBackgroundThread,
                      struct TTtmThread *ttmThreads,
                      struct TTtmThread *ttmHolidayThread)
@@ -180,15 +238,15 @@ void grUpdateDisplay(struct TTtmThread *ttmBackgroundThread,
     if (grBackgroundSfc != NULL)
         SDL_BlitSurface(grBackgroundSfc,
                         NULL,
-                        SDL_GetWindowSurface(sdl_window),
-                        &grScreenOrigin);
+                        grOffscreenSfc,
+                        NULL);
 
     // If not NULL, blit the optional layer of saved zones
     if (grSavedZonesLayer != NULL)
         SDL_BlitSurface(grSavedZonesLayer,
                         NULL,
-                        SDL_GetWindowSurface(sdl_window),
-                        &grScreenOrigin);
+                        grOffscreenSfc,
+                        NULL);
 
 
     // Blit successively each thread's layer
@@ -196,19 +254,22 @@ void grUpdateDisplay(struct TTtmThread *ttmBackgroundThread,
         if (ttmThreads[i].isRunning)
             SDL_BlitSurface(ttmThreads[i].ttmLayer,
                             NULL,
-                            SDL_GetWindowSurface(sdl_window),
-                            &grScreenOrigin);
+                            grOffscreenSfc,
+                            NULL);
 
     // Finally, blit the holiday layer
     if (ttmHolidayThread != NULL)
         if (ttmHolidayThread->isRunning)
             SDL_BlitSurface(ttmHolidayThread->ttmLayer,
                             NULL,
-                            SDL_GetWindowSurface(sdl_window),
-                            &grScreenOrigin);
+                            grOffscreenSfc,
+                            NULL);
 
     // Wait for the tick ...
     eventsWaitTick(grUpdateDelay);
+
+    // ... rotate the offscreen buffer to the window ...
+    grRotateAndBlitToWindow(grRotation);
 
     // ... and refresh the display
     SDL_UpdateWindowSurface(sdl_window);

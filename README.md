@@ -51,6 +51,9 @@ By default, the engine runs full screen and plays the life of Johnny on his isla
 
 But, if you're curious about how the engine works, you may type `jc_reborn help` and see the different options available. Feel free to try them and explore the inner workings of Screen Antics !
 
+### Command-line options
+
+`rotation <angle>`: Rotates the display. The angle can be `0` (default), `90`, `180`, or `270`.
 
 ## Current status
 
