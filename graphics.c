@@ -48,6 +48,7 @@ int grDx = 0;
 int grDy = 0;
 int grWindowed = 0;
 int grUpdateDelay = 0;
+static int grRotation = 0;
 
 
 static void grReleaseScreen()
@@ -111,16 +112,25 @@ void grLoadPalette(struct TPalResource *palResource)
 }
 
 
-void graphicsInit()
+void graphicsInit(int rotation)
 {
+    grRotation = rotation;
+    int windowWidth = SCREEN_WIDTH;
+    int windowHeight = SCREEN_HEIGHT;
+
+    if (grRotation == 90 || grRotation == 270) {
+        windowWidth = SCREEN_HEIGHT;
+        windowHeight = SCREEN_WIDTH;
+    }
+
     SDL_Init(SDL_INIT_VIDEO);
 
     sdl_window = SDL_CreateWindow(
         "Johnny Reborn ...?",
         SDL_WINDOWPOS_UNDEFINED,
         SDL_WINDOWPOS_UNDEFINED,
-        SCREEN_WIDTH,
-        SCREEN_HEIGHT,
+        windowWidth,
+        windowHeight,
         (grWindowed ? 0 : SDL_WINDOW_FULLSCREEN)
     );
 
@@ -131,8 +141,8 @@ void graphicsInit()
     if (grOffscreenSfc == NULL)
         fatalError("Could not create offscreen surface: %s", SDL_GetError());
 
-    grScreenOrigin.x = (SCREEN_WIDTH - 480) / 2;
-    grScreenOrigin.y = (SCREEN_HEIGHT - 640) / 2;
+    grScreenOrigin.x = (windowWidth - 640) / 2;
+    grScreenOrigin.y = (windowHeight - 480) / 2;
 
     if (!grWindowed)
         SDL_ShowCursor(SDL_DISABLE);
@@ -178,7 +188,7 @@ void grToggleFullScreen()
 }
 
 
-static void grRotateAndBlitToWindow()
+static void grRotateAndBlitToWindow(int rotation)
 {
     SDL_Surface *windowSfc = SDL_GetWindowSurface(sdl_window);
 
@@ -191,7 +201,22 @@ static void grRotateAndBlitToWindow()
     for (int y = 0; y < 480; y++) {
         for (int x = 0; x < 640; x++) {
             int srcOffset = (y * grOffscreenSfc->pitch) + (x * grOffscreenSfc->format->BytesPerPixel);
-            int dstOffset = ((639 - x) * windowSfc->pitch) + (y * windowSfc->format->BytesPerPixel);
+            int dstOffset;
+
+            switch (rotation) {
+                case 0:
+                    dstOffset = (y * windowSfc->pitch) + (x * windowSfc->format->BytesPerPixel);
+                    break;
+                case 90:
+                    dstOffset = ((639 - x) * windowSfc->pitch) + (y * windowSfc->format->BytesPerPixel);
+                    break;
+                case 180:
+                    dstOffset = ((479 - y) * windowSfc->pitch) + ((639 - x) * windowSfc->format->BytesPerPixel);
+                    break;
+                case 270:
+                    dstOffset = (x * windowSfc->pitch) + ((479 - y) * windowSfc->format->BytesPerPixel);
+                    break;
+            }
 
             dstPixels[dstOffset] = srcPixels[srcOffset];
             dstPixels[dstOffset + 1] = srcPixels[srcOffset + 1];
@@ -244,7 +269,7 @@ void grUpdateDisplay(struct TTtmThread *ttmBackgroundThread,
     eventsWaitTick(grUpdateDelay);
 
     // ... rotate the offscreen buffer to the window ...
-    grRotateAndBlitToWindow();
+    grRotateAndBlitToWindow(grRotation);
 
     // ... and refresh the display
     SDL_UpdateWindowSurface(sdl_window);
