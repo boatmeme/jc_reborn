@@ -23,8 +23,8 @@
 
 #include <SDL2/SDL.h>
 
-#define SCREEN_WIDTH        640
-#define SCREEN_HEIGHT       480
+#define SCREEN_WIDTH        480
+#define SCREEN_HEIGHT       640
 
 #define MAX_BMP_SLOTS       6
 #define MAX_SPRITES_PER_BMP 120
@@ -85,6 +85,8 @@ void grToggleFullScreen();
 void grUpdateDisplay(struct TTtmThread *ttmBackgroundThread,
                      struct TTtmThread *ttmThreads,
                      struct TTtmThread *ttmHolidayThreads);
+
+static void grRotateAndBlitToWindow();
 
 SDL_Surface *grNewEmptyBackground();
 SDL_Surface *grNewLayer();
